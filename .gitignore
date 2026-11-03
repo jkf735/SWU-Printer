@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+
+# Downloaded card data and images; rebuild with: python -m swu_momir.data.cards
+cache/

@@ -1,0 +1,34 @@
+{
+  "_readme": "Fixes applied to the SWU-DB data on every update (python -m swu_momir.data.cards). Rule for Ambush and Sentinel: a unit is tagged only if it can have the keyword itself, including conditionally ('this unit gains Sentinel while...'). Units that only give, remove, or refer to the keyword are not tagged. 'card' can be any printing of the unit. The update reports entries that no longer change anything, so they can be deleted.",
+  "corrections": [
+    {"card": "SHD-188", "name": "4-LOM", "add_keywords": ["Ambush"], "reason": "Has Ambush but is missing the tag."},
+    {"card": "TWI-037", "name": "Droideka Security", "add_keywords": ["Sentinel"], "reason": "Has Sentinel but is missing the tag."},
+
+    {"card": "HMW-053", "name": "Fett's Firespray", "remove_keywords": ["Ambush"], "reason": "Only lets friendly units attack bases while using Ambush."},
+    {"card": "LOF-180", "name": "Deceptive Shade", "remove_keywords": ["Ambush"], "reason": "Gives Ambush to the next unit played."},
+    {"card": "SEC-109", "name": "Diplomatic Envoy", "remove_keywords": ["Ambush"], "reason": "Gives Ambush to the next unit played."},
+    {"card": "SOR-079", "name": "Admiral Piett", "remove_keywords": ["Ambush"], "reason": "Gives Ambush to units costing 6 or more; Piett costs 2."},
+    {"card": "SOR-100", "name": "Wedge Antilles", "remove_keywords": ["Ambush"], "reason": "Gives Ambush to Vehicle units; Wedge isn't one."},
+
+    {"card": "ASH-127", "name": "The Twins", "remove_keywords": ["Sentinel"], "reason": "Gives Sentinel to another unit."},
+    {"card": "HMW-221", "name": "Teeka", "remove_keywords": ["Sentinel"], "reason": "Gives or removes Sentinel on a chosen unit."},
+    {"card": "HMW-246", "name": "Pyke Sarisa", "remove_keywords": ["Sentinel"], "reason": "Gives Sentinel to a chosen unit."},
+    {"card": "IC27-024", "name": "Grand Admiral Thrawn", "remove_keywords": ["Sentinel"], "reason": "Gives Sentinel to another unit."},
+    {"card": "JTL-047", "name": "Admiral Yularen", "remove_keywords": ["Grit", "Keyword", "Restore", "Sentinel", "Shielded"], "reason": "Gives the chosen keyword to Vehicle units; Yularen isn't one. 'Keyword' is a bad tag."},
+    {"card": "JTL-053", "name": "The Ghost", "remove_keywords": ["Keywords"], "reason": "'Keywords' is a bad tag. Keeps Sentinel, which it gains itself."},
+    {"card": "JTL-109", "name": "Jarek Yeager", "remove_keywords": ["Sentinel"], "reason": "Gives Sentinel to the unit he's attached to as a Pilot."},
+    {"card": "LAW-104", "name": "Bodhi Rook", "remove_keywords": ["Sentinel"], "reason": "Gives Sentinel to a chosen Rebel unit."},
+    {"card": "LOF-242", "name": "Refugee of The Path", "remove_keywords": ["Sentinel"], "reason": "Only refers to a unit with Sentinel."},
+    {"card": "SEC-031", "name": "Nute Gunray", "remove_keywords": ["Sentinel"], "reason": "Gives Sentinel to another unit."},
+    {"card": "SEC-032", "name": "Kylo Ren's Command Shuttle", "remove_keywords": ["Sentinel"], "reason": "Only buffs ground units with Sentinel."},
+    {"card": "SEC-082", "name": "Chancellor Palpatine", "remove_keywords": ["Sentinel"], "reason": "Gives Sentinel to Spy tokens."},
+    {"card": "SEC-120", "name": "Naboo Security Force", "remove_keywords": ["Sentinel"], "reason": "Gives Sentinel to a chosen unit."},
+    {"card": "SEC-248", "name": "B2EM0", "remove_keywords": ["Sentinel"], "reason": "Gives Sentinel to a chosen unit."},
+    {"card": "SEC-255", "name": "Remote Escort Tank", "remove_keywords": ["Sentinel"], "reason": "Gives Sentinel to a chosen unit."},
+    {"card": "SHD-037", "name": "Supreme Leader Snoke", "remove_keywords": ["Sentinel"], "reason": "Tagged, but its text never mentions Sentinel."},
+    {"card": "SOR-086", "name": "Gladiator Star Destroyer", "remove_keywords": ["Sentinel"], "reason": "Gives Sentinel to a chosen unit."},
+    {"card": "SOR-140", "name": "SpecForce Soldier", "remove_keywords": ["Sentinel"], "reason": "Removes Sentinel from a unit."},
+    {"card": "TS26-14", "name": "Yoda", "remove_keywords": ["Sentinel"], "reason": "Gives Sentinel to a Clone Trooper token."},
+    {"card": "TWI-046", "name": "Captain Typho", "remove_keywords": ["Sentinel"], "reason": "Gives Sentinel to a chosen unit."}
+  ]
+}
