@@ -80,7 +80,7 @@ class Machine:
         self.rng = rng
 
         self.mode = Mode.NORMAL
-        self.player_index = 0
+        self.player_index = PLAYERS.index("All")
         self.cost = 0
         self.arena_index = 0
         self.keyword_index = 0

@@ -21,7 +21,9 @@ class MachineTests(unittest.TestCase):
         self.path = Path(folder.name) / "state.json"
 
     def machine(self):
-        return Machine(UNITS, TOKENS, self.path)
+        machine = Machine(UNITS, TOKENS, self.path)
+        machine.turn(Knob.PLAYER, -1)  # from All, the startup position, to P1
+        return machine
 
     def test_setup_changes_only_that_player_and_survives_a_restart(self):
         machine = self.machine()
