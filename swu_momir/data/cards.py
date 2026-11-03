@@ -256,14 +256,17 @@ def load_tokens(path: Path = CACHE_PATH) -> list[dict]:
 
 
 def save_cards(units: list[dict], tokens: list[dict], path: Path = CACHE_PATH) -> None:
-    """Write the cache in one step, so a power cut can't leave half a file."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    document = {
+    write_json_atomic({
         "fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "sources": [UNITS_URL, TOKENS_URL],
         "units": units,
         "tokens": tokens,
-    }
+    }, path)
+
+
+def write_json_atomic(document: dict, path: Path) -> None:
+    """Write a JSON file in one step, so a power cut can't leave half a file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
     temp_path = path.with_name(path.name + ".tmp")
     with open(temp_path, "w", encoding="utf-8") as file:
         json.dump(document, file, ensure_ascii=False, indent=1)
