@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
+.vscode/
 
 # Downloaded card data and images; rebuild with: python -m swu_momir.data.cards
 cache/

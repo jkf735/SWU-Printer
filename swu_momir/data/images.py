@@ -1,4 +1,8 @@
-"""Download card images once and keep them on disk so they work offline."""
+"""Where card images live on disk, so everything works offline.
+
+Full-color originals in cache/images/ are only needed on the desktop. The Pi only
+needs the finished 1-bit files in cache/prints/, made by tools/prepare_images.py.
+"""
 
 import os
 from pathlib import Path
@@ -6,6 +10,12 @@ from pathlib import Path
 from swu_momir.data.cards import CACHE_PATH
 
 IMAGE_FOLDER = CACHE_PATH.parent / "images"
+PRINT_FOLDER = CACHE_PATH.parent / "prints"
+
+
+def print_image_path(card: dict, folder: Path = PRINT_FOLDER) -> Path:
+    """Return where a card's finished print image is kept."""
+    return folder / f"{card['id']}.png"
 
 
 def card_image_path(card: dict, folder: Path = IMAGE_FOLDER, timeout: float = 20) -> Path:

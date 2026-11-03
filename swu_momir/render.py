@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from PIL import Image, ImageFilter, ImageOps
+from PIL import Image, ImageFilter
 
 PRINT_WIDTH = 384  # the QR204 prints 384 dots across
 
