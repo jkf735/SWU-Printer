@@ -20,9 +20,10 @@ class PoolTests(unittest.TestCase):
         self.assertEqual(pool(Identity({"Vigilance": 2}, neutral=False)), ["double", "single"])
         self.assertEqual(pool(ALL_MODE), ["double", "single", "mixed", "neutral"])
 
-    def test_nine_means_nine_plus_and_an_empty_pool_rolls_the_porg(self):
-        units = [unit("eight", cost=8), unit("nine", cost=9), unit("twelve", cost=12), unit("LOF-254", cost=0)]
-        self.assertEqual([u["id"] for u in eligible_units(units, ALL_MODE, 9)], ["nine", "twelve"])
+    def test_ten_means_ten_plus_and_an_empty_pool_rolls_the_porg(self):
+        units = [unit("nine", cost=9), unit("ten", cost=10), unit("twelve", cost=12), unit("LOF-254", cost=0)]
+        self.assertEqual([u["id"] for u in eligible_units(units, ALL_MODE, 9)], ["nine"])
+        self.assertEqual([u["id"] for u in eligible_units(units, ALL_MODE, 10)], ["ten", "twelve"])
         self.assertEqual(roll(units, [])["id"], "LOF-254")
 
 

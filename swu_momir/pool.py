@@ -4,7 +4,7 @@ import random
 from dataclasses import dataclass, field
 
 ALL_MODE = None  # the middle Player knob position: no identity filter
-COST_PLUS = 9  # the 9 setting means 9 or more
+COST_PLUS = 10  # the 10 setting means 10 or more
 PORG_ID = "LOF-254"  # printed as a joke when the pool is empty
 
 
