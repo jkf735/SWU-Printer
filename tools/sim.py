@@ -1,10 +1,11 @@
-"""Play through the machine's controls on a desktop, with no hardware.
+"""Play through the machine's controls with no hardware, on a desktop or the Pi.
 
-Run from the project folder with:  python -m tools.sim
+Run from the project folder with:  python -m tools.sim  (python3 on the Pi)
 
 Printed cards are saved to cache/last_print.png, so keep that open in an editor
-tab to see them. Identities and the last card are saved to cache/state.json, as
-they would be on the Pi.
+tab to see them. Over SSH on the Pi, the status line names the card instead.
+Identities and the last card are saved to cache/state.json, as they would be on
+the Pi.
 """
 
 import os
@@ -41,11 +42,16 @@ Esc quits"""
 
 
 def read_keys():
-    """Yield one key at a time: instantly in a Windows console, otherwise from piped text."""
+    """Yield one key at a time: instantly in a terminal, otherwise from piped text."""
     if not sys.stdin.isatty():
         yield from sys.stdin.read().replace("\n", "")
-        return
+    elif os.name == "nt":
+        yield from read_windows_keys()
+    else:
+        yield from read_linux_keys()
 
+
+def read_windows_keys():
     import msvcrt
 
     while True:
@@ -54,6 +60,25 @@ def read_keys():
             msvcrt.getwch()
             continue
         yield key
+
+
+def read_linux_keys():
+    import termios
+    import tty
+
+    stdin = sys.stdin.fileno()
+    saved_settings = termios.tcgetattr(stdin)
+    tty.setcbreak(stdin)  # send keys right away, without waiting for Enter or echoing them
+    try:
+        while True:
+            keys = os.read(stdin, 32).decode(errors="ignore")
+            if keys.startswith("\x1b") and len(keys) > 1:  # an arrow or function key, not Esc
+                continue
+            yield from keys
+    except KeyboardInterrupt:
+        pass
+    finally:
+        termios.tcsetattr(stdin, termios.TCSADRAIN, saved_settings)
 
 
 def light(machine: Machine, name: str, label: str) -> str:
@@ -98,7 +123,7 @@ def show_print(card: dict) -> str:
 def main(state_path=STATE_PATH) -> None:
     machine = Machine(load_units(), load_tokens(), state_path)
     interactive = sys.stdin.isatty()
-    if interactive:
+    if interactive and os.name == "nt":
         os.system("")  # lets the Windows console understand the clear-screen code below
 
     def draw(status: str) -> None:
