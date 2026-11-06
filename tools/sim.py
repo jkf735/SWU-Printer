@@ -2,6 +2,9 @@
 
 Run from the project folder with:  python -m tools.sim  (python3 on the Pi)
 
+To also show the aspect lights on the real LEDs, run it on the Pi with:
+    sudo .venv/bin/python -m tools.sim --lights
+
 Printed cards are saved to cache/last_print.png, so keep that open in an editor
 tab to see them. Over SSH on the Pi, the status line names the card instead.
 Identities and the last card are saved to cache/state.json, as they would be on
@@ -11,6 +14,7 @@ the Pi.
 import os
 import shutil
 import sys
+import threading
 
 from swu_momir.data.cards import CACHE_PATH, load_tokens, load_units
 from swu_momir.data.images import print_image_path
@@ -19,6 +23,7 @@ from swu_momir.state import (COLORS, SETUP_CURSOR, STATE_PATH, Button, Knob, Mac
 
 LAST_PRINT_PATH = CACHE_PATH.with_name("last_print.png")
 QUIT_KEYS = ("\x1b", "\x03")  # Esc and Ctrl-C
+BLINK_SECONDS = 0.4
 
 TURNS = {
     "q": (Knob.PLAYER, -1), "w": (Knob.PLAYER, 1),
@@ -81,6 +86,36 @@ def read_linux_keys():
         termios.tcsetattr(stdin, termios.TCSADRAIN, saved_settings)
 
 
+class Lights:
+    """Mirrors the machine on the real aspect lights, blinking the setup cursor."""
+
+    def __init__(self, machine: Machine):
+        from swu_momir.hw.leds import Leds  # Pi-only
+
+        self.machine = machine
+        self.leds = Leds()
+        self.lock = threading.Lock()  # the blink thread and the key loop both update the lights
+        self.blink_on = True
+        self.stopped = threading.Event()
+        threading.Thread(target=self._blink, daemon=True).start()
+
+    def update(self) -> None:
+        with self.lock:
+            if not self.stopped.is_set():
+                self.leds.show(self.machine.lit_lights(), self.machine.cursor, self.blink_on)
+
+    def _blink(self) -> None:
+        while not self.stopped.wait(BLINK_SECONDS):
+            self.blink_on = not self.blink_on
+            if self.machine.cursor:
+                self.update()
+
+    def off(self) -> None:
+        self.stopped.set()
+        with self.lock:
+            self.leds.off()
+
+
 def light(machine: Machine, name: str, label: str) -> str:
     """Return one light as text: [Vig] is lit, >Vig< is the setup cursor, and vig is dark."""
     is_lit = name in machine.lit_lights()
@@ -122,29 +157,36 @@ def show_print(card: dict) -> str:
 
 def main(state_path=STATE_PATH) -> None:
     machine = Machine(load_units(), load_tokens(), state_path)
+    lights = Lights(machine) if "--lights" in sys.argv[1:] else None
     interactive = sys.stdin.isatty()
     if interactive and os.name == "nt":
         os.system("")  # lets the Windows console understand the clear-screen code below
 
     def draw(status: str) -> None:
         print(("\x1b[2J\x1b[H" if interactive else "\n") + frame(machine, status), flush=True)
+        if lights:
+            lights.update()
 
-    draw(f"Printed cards are saved to {LAST_PRINT_PATH}")
-    for key in read_keys():
-        if key in QUIT_KEYS:
-            break
-        key = key.lower()
-        status = ""
-        if key in TURNS:
-            machine.turn(*TURNS[key])
-        elif key in PRESSES:
-            result = machine.press(PRESSES[key])
-            if isinstance(result, PrintCard):
-                status = show_print(result.card)
-            elif isinstance(result, ShutDown):
-                draw("The Pi would shut down now. Run the sim again to wake it.")
+    try:
+        draw(f"Printed cards are saved to {LAST_PRINT_PATH}")
+        for key in read_keys():
+            if key in QUIT_KEYS:
                 break
-        draw(status)
+            key = key.lower()
+            status = ""
+            if key in TURNS:
+                machine.turn(*TURNS[key])
+            elif key in PRESSES:
+                result = machine.press(PRESSES[key])
+                if isinstance(result, PrintCard):
+                    status = show_print(result.card)
+                elif isinstance(result, ShutDown):
+                    draw("The Pi would shut down now. Run the sim again to wake it.")
+                    break
+            draw(status)
+    finally:
+        if lights:
+            lights.off()
 
 
 if __name__ == "__main__":
