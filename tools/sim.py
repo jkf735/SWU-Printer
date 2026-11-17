@@ -4,6 +4,7 @@ Run from the project folder with:  python -m tools.sim  (python3 on the Pi)
 
 To also show the aspect lights on the real LEDs, run it on the Pi with:
     sudo .venv/bin/python -m tools.sim --lights
+Add --controls to take input from the real knobs and buttons too. The keys still work.
 
 Printed cards are saved to cache/last_print.png, so keep that open in an editor
 tab to see them. Over SSH on the Pi, the status line names the card instead.
@@ -12,9 +13,11 @@ the Pi.
 """
 
 import os
+import queue
 import shutil
 import sys
 import threading
+from contextlib import contextmanager
 
 from swu_momir.data.cards import CACHE_PATH, load_tokens, load_units
 from swu_momir.data.images import print_image_path
@@ -56,6 +59,37 @@ def read_keys():
         yield from read_linux_keys()
 
 
+def send_key_events(events: queue.Queue) -> None:
+    """Turn keys into the same events the knobs and buttons send, then None to quit."""
+    for key in read_keys():
+        if key in QUIT_KEYS:
+            break
+        key = key.lower()
+        if key in TURNS:
+            events.put(TURNS[key])
+        elif key in PRESSES:
+            events.put(PRESSES[key])
+    events.put(None)
+
+
+@contextmanager
+def keys_without_enter():
+    """In a Linux terminal, send keys right away, without waiting for Enter or echoing them."""
+    if os.name == "nt" or not sys.stdin.isatty():
+        yield
+        return
+    import termios
+    import tty
+
+    stdin = sys.stdin.fileno()
+    saved_settings = termios.tcgetattr(stdin)
+    tty.setcbreak(stdin)
+    try:
+        yield
+    finally:
+        termios.tcsetattr(stdin, termios.TCSADRAIN, saved_settings)
+
+
 def read_windows_keys():
     import msvcrt
 
@@ -68,22 +102,12 @@ def read_windows_keys():
 
 
 def read_linux_keys():
-    import termios
-    import tty
-
     stdin = sys.stdin.fileno()
-    saved_settings = termios.tcgetattr(stdin)
-    tty.setcbreak(stdin)  # send keys right away, without waiting for Enter or echoing them
-    try:
-        while True:
-            keys = os.read(stdin, 32).decode(errors="ignore")
-            if keys.startswith("\x1b") and len(keys) > 1:  # an arrow or function key, not Esc
-                continue
-            yield from keys
-    except KeyboardInterrupt:
-        pass
-    finally:
-        termios.tcsetattr(stdin, termios.TCSADRAIN, saved_settings)
+    while True:
+        keys = os.read(stdin, 32).decode(errors="ignore")
+        if keys.startswith("\x1b") and len(keys) > 1:  # an arrow or function key, not Esc
+            continue
+        yield from keys
 
 
 class Lights:
@@ -157,7 +181,15 @@ def show_print(card: dict) -> str:
 
 def main(state_path=STATE_PATH) -> None:
     machine = Machine(load_units(), load_tokens(), state_path)
-    lights = Lights(machine) if "--lights" in sys.argv[1:] else None
+    args = sys.argv[1:]
+    lights = Lights(machine) if "--lights" in args else None
+    controls = None
+    if "--controls" in args:
+        from swu_momir.hw.inputs import Inputs  # Pi-only
+
+        controls = Inputs()
+    # The keys and the real controls send the same events, into one queue.
+    events = controls.events if controls else queue.Queue()
     interactive = sys.stdin.isatty()
     if interactive and os.name == "nt":
         os.system("")  # lets the Windows console understand the clear-screen code below
@@ -168,23 +200,26 @@ def main(state_path=STATE_PATH) -> None:
             lights.update()
 
     try:
-        draw(f"Printed cards are saved to {LAST_PRINT_PATH}")
-        for key in read_keys():
-            if key in QUIT_KEYS:
-                break
-            key = key.lower()
-            status = ""
-            if key in TURNS:
-                machine.turn(*TURNS[key])
-            elif key in PRESSES:
-                result = machine.press(PRESSES[key])
-                if isinstance(result, PrintCard):
-                    status = show_print(result.card)
-                elif isinstance(result, ShutDown):
-                    draw("The Pi would shut down now. Run the sim again to wake it.")
-                    break
-            draw(status)
+        with keys_without_enter():
+            threading.Thread(target=send_key_events, args=(events,), daemon=True).start()
+            draw(f"Printed cards are saved to {LAST_PRINT_PATH}")
+            while (event := events.get()) is not None:
+                status = ""
+                if isinstance(event, Button):
+                    result = machine.press(event)
+                    if isinstance(result, PrintCard):
+                        status = show_print(result.card)
+                    elif isinstance(result, ShutDown):
+                        draw("The Pi would shut down now. Run the sim again to wake it.")
+                        break
+                else:
+                    machine.turn(*event)
+                draw(status)
+    except KeyboardInterrupt:
+        pass
     finally:
+        if controls:
+            controls.close()
         if lights:
             lights.off()
 

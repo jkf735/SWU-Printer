@@ -1,6 +1,8 @@
 # SWU-Printer
 
-A Star Wars: Unlimited (SWU) printer, inspired by the popular Momir-style printers for Magic: The Gathering.
+A Star Wars: Unlimited (SWU) printer designed for a Momir-style game!
+
+Inspired by some popular Momir-style printers for Magic: The Gathering (https://github.com/Stefan-Horst/MtG-Printer/tree/main https://www.youtube.com/watch?v=UA_lhvMBj6c).
 
 Players set a cost and optional filters (arena and keyword), then press Print. A Raspberry Pi picks a random unit that matches the active player's aspects and prints it on a 58mm thermal printer, so it can be played in paper. Aspect lights on the front panel show each player's aspects.
 
@@ -8,7 +10,7 @@ Players set a cost and optional filters (arena and keyword), then press Print. A
 
 ## Contents
 
-1. [Hardware setup](#hardware-setup): flash the microSD card, first boot, wire the aspect lights
+1. [Hardware setup](#hardware-setup): flash the microSD card, first boot, wire the aspect lights, knobs and buttons
 2. [Software setup](#software-setup): connect over SSH, configure the Pi, get the code and card data
 3. [Software tests](#software-tests): test each piece of hardware on its own, then run the simulator
 
@@ -22,6 +24,8 @@ Players set a cost and optional filters (arena and keyword), then press Print. A
 - A micro-USB power supply for the Pi while testing (2.5A)
 - WS2811 5V pixel string (12mm bullet pixels). Only the first 11 pixels are used.
 - 74AHCT14 hex inverter, to raise the LED data signal from 3.3V to 5V
+- 4 KY-040 rotary encoders (the knobs), with knob caps
+- 2 arcade buttons, a 30mm one for Print and a 24mm one for Utility, with 0.11" quick-connect wires. LED buttons are fine; the LEDs aren't used.
 - Breadboard and jumper wires
 
 ### 1. Flash the microSD card
@@ -55,23 +59,25 @@ Header pins are numbered as in the diagram below. Hold the Pi with the header on
 
 | LED string wire | Pi header pin |
 |---|---|
-| 5V | pin 2 or 4 (5V) |
+| 5V | pin 2 (5V) |
 | Ground | pin 6 (Ground) |
 | Data in | pin 12 (GPIO 18), through the 74AHCT14 as shown below |
 
 - **Use the input end of the string.** The pixels usually have a small arrow that points away from the input. Wire colors vary, so go by the labels if there are any.
 - **Count the pins carefully.** 5V on a GPIO pin can damage the Pi.
 
-**74AHCT14 level shifter:** the Pi's 3.3V data signal is below what 5V pixels expect. That sometimes works, but it isn't reliable, so the 74AHCT14 raises it to 5V. Each of its gates inverts the signal, so the data goes through two gates and comes out the right way up:
+**74AHCT14 level shifter:** the Pi's 3.3V data signal is below what 5V pixels expect. That sometimes works, but it isn't reliable, so the 74AHCT14 raises it to 5V.
+
+Put the chip on the breadboard across the center gap. With its notch pointing away from you, pin 1 is the top-left leg, pins 1–7 run down the left side, and pins 8–14 run back up the right side. Power it from one pair of the breadboard's edge rails: Pi pin 4 (5V) to the + rail and Pi pin 14 (Ground) to the − rail. Leave the rails on the other edge free.
 
 | 74AHCT14 pin | Connect to |
 |---|---|
-| 14 (VCC) | 5V |
-| 7 (GND) | Ground |
+| 14 (VCC) | + rail (5V) |
+| 7 (GND) | − rail (Ground) |
 | 1 (input 1A) | Pi pin 12 (GPIO 18) |
 | 2 (output 1Y) | pin 3 |
 | 4 (output 2Y) | LED string data in |
-| 5, 9, 11, 13 (unused inputs) | Ground |
+| 5, 9, 11, 13 (unused inputs) | − rail (Ground) |
 
 The pixels light in this order along the chain. Pixel 0 is closest to the Pi:
 
@@ -92,6 +98,37 @@ The pixels light in this order along the chain. Pixel 0 is closest to the Pi:
 On the front panel, pixels 0–6 form the bottom row from right to left, and pixels 7–10 run back across the top row above the four colors.
 
 **Cutting the string:** once the panel layout is final, unplug everything and cut between the 11th and 12th pixels, keeping the input end. Tape over each cut wire on the 11-pixel piece, since they carry power. Keep the rest as spares.
+
+### 4. Wire the knobs and buttons
+
+**Shut down and unplug the Pi first.** The knobs run on **3.3V, never 5V**. Their boards pull their signal pins up to whatever powers them, so 5V would reach the Pi's GPIO pins and can damage them.
+
+Use the pair of power rails on the **other edge** of the breadboard from the 74AHCT14:
+
+- Pi **pin 1** (3.3V) → this edge's **+ rail**. Keep it apart from the 5V rail.
+- A jumper from this edge's **− rail** to the 74AHCT14's − rail, so every ground on the board is shared.
+
+**Knobs:** each KY-040 has five pins. On each one, **+ → 3.3V rail** and **GND → − rail**, then:
+
+| Knob | CLK | DT | SW |
+|---|---|---|---|
+| Player | pin 11 (GPIO 17) | pin 15 (GPIO 22) | pin 16 (GPIO 23) |
+| Cost | pin 29 (GPIO 5) | pin 31 (GPIO 6) | pin 33 (GPIO 13) |
+| Arena | pin 38 (GPIO 20) | pin 40 (GPIO 21) | pin 32 (GPIO 12) |
+| Keyword | pin 35 (GPIO 19) | pin 37 (GPIO 26) | pin 36 (GPIO 16) |
+
+Only the keyword knob's push (SW) does anything in the game, but wiring all four leaves room for later.
+
+**Buttons:** each button has one leg to a Pi pin and the other to ground. It doesn't matter which leg goes where.
+
+| Button | Pi pin | Other leg |
+|---|---|---|
+| Print | pin 7 (GPIO 4) | − rail |
+| Utility | pin 5 (GPIO 3) | − rail |
+
+- **LED buttons have four terminals.** Two are the switch and two are the unused LED. To find the switch, set a multimeter to continuity (the beep setting): the pair that beeps only while the button is pressed is the switch.
+- The quick-connect wires end in a 2-pin plug. Push it into the breadboard so its **two pins land in two different rows**. If both land in the same row, the button reads as always pressed. Then run one jumper from each row: one to the Pi pin, one to the − rail.
+- The utility button is on GPIO 3 because pressing a button on that pin wakes a Pi that has been shut down.
 
 ---
 
@@ -159,7 +196,9 @@ Everything on the Pi runs with one Python environment in the project folder. `--
 ```bash
 python3 -m venv --system-site-packages ~/SWU-Printer/.venv
 ~/SWU-Printer/.venv/bin/pip install rpi_ws281x
+sudo apt install -y python3-gpiozero python3-lgpio
 ```
+The `apt` line is for the knobs and buttons. Raspberry Pi OS usually has these already, in which case it changes nothing.
 If the install fails while building, run `sudo apt install -y python3-dev build-essential` and try again.
 
 ### 6. Get the card data and print images
@@ -211,6 +250,31 @@ If something looks wrong, the settings are at the top of `swu_momir/hw/leds.py`:
 | Flickering or random colors | Change `FREQUENCY` to `400_000`. |
 | Too bright or too dim | Change `BRIGHTNESS` (out of 255). |
 
+### Knobs and buttons
+
+With the knobs and buttons wired as in [Wire the knobs and buttons](#4-wire-the-knobs-and-buttons):
+```bash
+.venv/bin/python -m tools.input_test
+```
+This one doesn't need `sudo`. The terminal shows each event the game would get. Press **Ctrl+C** to stop.
+
+- **Knobs:** each click should count exactly 1, with + for clockwise and − for counterclockwise. A running count per knob helps spot skipped clicks.
+- **Keyword knob push:** a click shows "Keyword push" when you let go. Holding it for 1 second shows "Keyword hold", and letting go after a hold shows nothing.
+- **Utility button:** a press shows "Utility press" a moment later, because it waits to rule out a double-press. Two quick presses show "Utility double-press". Holding it for 2 seconds shows the long press.
+- **Print button:** shows "Print" right away.
+- **The other three knobs' pushes** show "push (unused)". They do nothing in the game, so this just checks their wiring.
+
+If something looks wrong, the settings are at the top of `swu_momir/hw/inputs.py`:
+
+| Problem | Fix |
+|---|---|
+| A knob counts the wrong way | Add it to `REVERSED`, for example `frozenset({Knob.COST})`. |
+| A knob does nothing | Check its + is on the 3.3V rail, its GND on the − rail, and its CLK and DT pins. |
+| A knob counts only every second click | Some encoders send half a step per click. That needs a change to the driver. |
+| A button reads as pressed all the time | Its plug's two pins are in the same breadboard row. |
+| Quick double-presses come through as two single presses | Raise `DOUBLE_PRESS_SECONDS`. Lower it if single presses feel slow. |
+| `No module named 'gpiozero'` | Run the `apt` line from [Make the Python environment](#5-make-the-python-environment). |
+
 ### Simulator
 
 The simulator runs the machine's logic in the terminal, with keys standing in for the knobs and buttons. It shows the lights and the display as text. This is useful for tests while building when all components may not be integrated yet or to pinpoint specific failures.
@@ -224,6 +288,11 @@ On the Pi, add `--lights` to also show the aspect lights on the real LEDs:
 sudo .venv/bin/python -m tools.sim --lights
 ```
 Without `--lights`, it runs on the Pi with plain `python3 -m tools.sim`.
+
+Add `--controls` to play with the real knobs and buttons, with the terminal standing in for the display. The keys keep working too. With both:
+```bash
+sudo .venv/bin/python -m tools.sim --lights --controls
+```
 
 | Control | Keys |
 |---|---|
