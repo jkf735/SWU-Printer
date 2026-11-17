@@ -117,7 +117,7 @@ Use the pair of power rails on the **other edge** of the breadboard from the 74A
 | Arena | pin 38 (GPIO 20) | pin 40 (GPIO 21) | pin 32 (GPIO 12) |
 | Keyword | pin 35 (GPIO 19) | pin 37 (GPIO 26) | pin 36 (GPIO 16) |
 
-Only the keyword knob's push (SW) does anything in the game, but wiring all four leaves room for later.
+Only the player and cost knobs' pushes (SW) do anything in the game, but wiring all four leaves room for later.
 
 **Buttons:** each button has one leg to a Pi pin and the other to ground. It doesn't matter which leg goes where.
 
@@ -259,10 +259,11 @@ With the knobs and buttons wired as in [Wire the knobs and buttons](#4-wire-the-
 This one doesn't need `sudo`. The terminal shows each event the game would get. Press **Ctrl+C** to stop.
 
 - **Knobs:** each click should count exactly 1, with + for clockwise and − for counterclockwise. A running count per knob helps spot skipped clicks.
-- **Keyword knob push:** a click shows "Keyword push" when you let go. Holding it for 1 second shows "Keyword hold", and letting go after a hold shows nothing.
+- **Player knob push:** a click shows "Player push" when you let go. Holding it for 1 second shows "Player hold", and letting go after a hold shows nothing.
+- **Cost knob push:** shows "Cost push" right away.
 - **Utility button:** a press shows "Utility press" a moment later, because it waits to rule out a double-press. Two quick presses show "Utility double-press". Holding it for 2 seconds shows the long press.
-- **Print button:** shows "Print" right away.
-- **The other three knobs' pushes** show "push (unused)". They do nothing in the game, so this just checks their wiring.
+- **Print button:** shows "Print" right away. Presses in the next 2 seconds are ignored, so a double-click can't print twice.
+- **The arena and keyword knobs' pushes** show "push (unused)". They do nothing in the game, so this just checks their wiring.
 
 If something looks wrong, the settings are at the top of `swu_momir/hw/inputs.py`:
 
@@ -300,11 +301,12 @@ sudo .venv/bin/python -m tools.sim --lights --controls
 | Cost knob | `e` `r` |
 | Arena knob | `t` `y` |
 | Keyword knob | `u` `i` |
-| Keyword knob push / hold | `o` / `p` |
+| Player knob push / hold | `a` / `s` |
+| Cost knob push | `d` |
 | Print button | Space |
 | Utility button: press / double-press / long-press | `z` / `x` / `c` |
 | Quit | Esc |
 
 Printed cards are saved to `cache/last_print.png`, so keep that file open in an image viewer or editor tab to see each print. Over SSH, the status line names the card instead. Player settings are saved to `cache/state.json`, and the real machine uses the same file, so delete it for a clean start.
 
-To set a player's aspects: turn the player knob to P1 or P2 (`q` or `w`), hold the keyword knob (`p`), move the cursor with `u` and `i`, press `o` to change the selected aspect, then press utility (`z`) to save.
+To set a player's aspects: turn the player knob to P1 or P2 (`q` or `w`), hold the player knob (`s`), move the cursor with the cost knob (`e` and `r`), press the cost knob (`d`) to change the selected aspect, then press the player knob (`a`) to save. Utility (`z`) in setup starts that player over.

@@ -27,12 +27,12 @@ class MachineTests(unittest.TestCase):
 
     def test_setup_changes_only_that_player_and_survives_a_restart(self):
         machine = self.machine()
-        machine.press(Button.KEYWORD_HOLD)
+        machine.press(Button.PLAYER_HOLD)
         self.assertIs(machine.mode, Mode.SETUP)
-        machine.press(Button.KEYWORD_PUSH)
-        machine.press(Button.KEYWORD_PUSH)  # Vigilance is first on the cursor: now x2
+        machine.press(Button.COST_PUSH)
+        machine.press(Button.COST_PUSH)  # Vigilance is first on the cursor: now x2
         self.assertEqual(machine.display_rows()[2], "Pool 3")
-        machine.press(Button.UTILITY)
+        machine.press(Button.PLAYER_PUSH)
 
         restarted = self.machine()
         self.assertEqual(restarted.identities["P1"].aspects, {"Vigilance": 2})

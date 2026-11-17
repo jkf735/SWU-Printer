@@ -16,8 +16,9 @@ from swu_momir.pool import ALL_MODE, COST_PLUS, Identity, eligible_units, roll
 STATE_PATH = CACHE_PATH.with_name("state.json")
 
 PLAYERS = ("P1", "All", "P2")
-ARENA_CHOICES = (None, "Ground", "Space")
-KEYWORD_CHOICES = (None, "Ambush", "Sentinel")
+# The no-filter choice is in the middle of each knob, like All on the player knob.
+ARENA_CHOICES = ("Ground", None, "Space")
+KEYWORD_CHOICES = ("Ambush", None, "Sentinel")
 
 COLORS = ("Vigilance", "Command", "Aggression", "Cunning")
 ALIGNMENTS = ("Heroism", "Villainy")
@@ -45,8 +46,9 @@ class Button(Enum):
     UTILITY = auto()
     UTILITY_DOUBLE = auto()
     UTILITY_LONG = auto()
-    KEYWORD_PUSH = auto()
-    KEYWORD_HOLD = auto()
+    PLAYER_PUSH = auto()
+    PLAYER_HOLD = auto()
+    COST_PUSH = auto()
 
 
 @dataclass(frozen=True)
@@ -82,8 +84,8 @@ class Machine:
         self.mode = Mode.NORMAL
         self.player_index = PLAYERS.index("All")
         self.cost = 0
-        self.arena_index = 0
-        self.keyword_index = 0
+        self.arena_index = ARENA_CHOICES.index(None)
+        self.keyword_index = KEYWORD_CHOICES.index(None)
         self.cursor_index = 0
         self.token_index = 0
         self.identities = {"P1": Identity(), "P2": Identity()}
@@ -122,15 +124,15 @@ class Machine:
                 if player_index != self.player_index:
                     # Filters are paid for per roll, so they don't carry over to the next player.
                     self.player_index = player_index
-                    self.arena_index = 0
-                    self.keyword_index = 0
+                    self.arena_index = ARENA_CHOICES.index(None)
+                    self.keyword_index = KEYWORD_CHOICES.index(None)
             elif knob is Knob.COST:
                 self.cost = clamp(self.cost + steps, COST_PLUS)
             elif knob is Knob.ARENA:
                 self.arena_index = clamp(self.arena_index + steps, len(ARENA_CHOICES) - 1)
             elif knob is Knob.KEYWORD:
                 self.keyword_index = clamp(self.keyword_index + steps, len(KEYWORD_CHOICES) - 1)
-        elif self.mode is Mode.SETUP and knob is Knob.KEYWORD:
+        elif self.mode is Mode.SETUP and knob is Knob.COST:
             self.cursor_index = (self.cursor_index + steps) % len(SETUP_CURSOR)
         elif self.mode is Mode.TOKEN and knob is Knob.COST:
             self.token_index = (self.token_index + steps) % len(self.tokens)
@@ -156,17 +158,17 @@ class Machine:
             return PrintCard(self.last_card)
         if button is Button.UTILITY_DOUBLE:
             self.mode = Mode.TOKEN
-        elif button is Button.KEYWORD_HOLD and self.player != "All":
+        elif button is Button.PLAYER_HOLD and self.player != "All":
             self.mode = Mode.SETUP
             self.cursor_index = 0
         return None
 
     def _press_setup(self, button: Button) -> None:
-        if button is Button.KEYWORD_PUSH:
+        if button is Button.COST_PUSH:
             self.identities[self.player] = cycle_aspect(self.identity, self.cursor)
-        elif button is Button.KEYWORD_HOLD:
-            self.identities[self.player] = Identity()  # start over for a new game
         elif button in (Button.UTILITY, Button.UTILITY_DOUBLE):
+            self.identities[self.player] = Identity()  # start over for a new game
+        elif button in (Button.PLAYER_PUSH, Button.PLAYER_HOLD):
             self.mode = Mode.NORMAL
             self._save()
 

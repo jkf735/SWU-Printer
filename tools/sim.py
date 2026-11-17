@@ -35,8 +35,9 @@ TURNS = {
     "u": (Knob.KEYWORD, -1), "i": (Knob.KEYWORD, 1),
 }
 PRESSES = {
-    "o": Button.KEYWORD_PUSH,
-    "p": Button.KEYWORD_HOLD,
+    "a": Button.PLAYER_PUSH,
+    "s": Button.PLAYER_HOLD,
+    "d": Button.COST_PUSH,
     " ": Button.PRINT,
     "z": Button.UTILITY,
     "x": Button.UTILITY_DOUBLE,
@@ -44,7 +45,7 @@ PRESSES = {
 }
 LEGEND = """\
 Knobs (left, right):  Player q w   Cost e r   Arena t y   Keyword u i
-Keyword knob:         o push   p hold
+Knob pushes:          Player a push, s hold   Cost d push
 Buttons:              Space Print   z Utility   x double-press   c long-press
 Esc quits"""
 
@@ -218,10 +219,12 @@ def main(state_path=STATE_PATH) -> None:
     except KeyboardInterrupt:
         pass
     finally:
-        if controls:
-            controls.close()
         if lights:
             lights.off()
+    if controls:
+        # Closing gpiozero's buttons can hang, so skip it: the pins are freed when the program ends.
+        sys.stdout.flush()
+        os._exit(0)
 
 
 if __name__ == "__main__":
