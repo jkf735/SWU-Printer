@@ -128,7 +128,7 @@ Only the player and cost knobs' pushes (SW) do anything in the game, but wiring 
 | Utility | pin 5 (GPIO 3) | − rail |
 
 - **LED buttons have four terminals.** Two are the switch and two are the unused LED. To find the switch, set a multimeter to continuity (the beep setting): the pair that beeps only while the button is pressed is the switch.
-- The quick-connect wires end in a 2-pin plug. Push it into the breadboard so its **two pins land in two different rows**. If both land in the same row, the button reads as always pressed. Then run one jumper from each row: one to the Pi pin, one to the − rail.
+- The quick-connect wires end in a 2-pin female socket. Push a male-to-male jumper into each of its two holes, then run one jumper to the Pi pin and the other to the − rail.
 - The utility button is on GPIO 3 because pressing a button on that pin wakes a Pi that has been shut down.
 
 ### 5. Wire the display
@@ -292,7 +292,6 @@ If something looks wrong, the settings are at the top of `swu_momir/hw/inputs.py
 | A knob counts the wrong way | Add it to `REVERSED`, for example `frozenset({Knob.COST})`. |
 | A knob does nothing | Check its + is on the 3.3V rail, its GND on the − rail, and its CLK and DT pins. |
 | A knob counts only every second click | Some encoders send half a step per click. That needs a change to the driver. |
-| A button reads as pressed all the time | Its plug's two pins are in the same breadboard row. |
 | Quick double-presses come through as two single presses | Raise `DOUBLE_PRESS_SECONDS`. Lower it if single presses feel slow. |
 | `No module named 'gpiozero'` | Run the `apt` line from [Make the Python environment](#5-make-the-python-environment). |
 
