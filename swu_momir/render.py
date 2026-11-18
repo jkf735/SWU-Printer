@@ -1,8 +1,12 @@
-"""Turn card images into the 1-bit images the thermal printer prints."""
+"""Turn card images into the 1-bit images the thermal printer prints, and the display's
+text into frames for the OLED."""
 
+import re
+from collections.abc import Sequence
 from dataclasses import dataclass
+from functools import lru_cache
 
-from PIL import Image, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 PRINT_WIDTH = 384  # the QR204 prints 384 dots across
 
@@ -40,3 +44,42 @@ def render_card(image: Image.Image, style: PrintStyle = DEFAULT_STYLE) -> Image.
     if style.dither:
         return gray.convert("1", dither=Image.Dither.FLOYDSTEINBERG)
     return gray.convert("1", dither=Image.Dither.NONE)
+
+
+DISPLAY_SIZE = (128, 64)  # the OLED's pixels
+# Largest first: a row that doesn't fit at one size is drawn at the next. Sizes 16 and 17
+# are skipped because the built-in font's "i" loses its dot at them in 1-bit.
+DISPLAY_FONT_SIZES = (18, 15, 13, 11)
+DISPLAY_MARGIN = 2  # blank pixels kept at the left and right edges
+
+
+@lru_cache(maxsize=None)
+def display_font(size: int) -> ImageFont.ImageFont | ImageFont.FreeTypeFont:
+    try:
+        return ImageFont.load_default(size)  # Pillow's built-in font, at any size (Pillow 10.1+)
+    except (TypeError, ImportError, OSError):
+        return ImageFont.load_default()  # a small fixed font, without FreeType
+
+
+def render_display(rows: Sequence[str]) -> Image.Image:
+    """Return the display's rows of text as a 1-bit image the size of the OLED.
+
+    A run of two or more spaces in a row splits it: the text after it goes against the right
+    edge, as in "P1          Cost 5".
+    """
+    width, height = DISPLAY_SIZE
+    image = Image.new("1", DISPLAY_SIZE)
+    draw = ImageDraw.Draw(image)
+    band = height / len(rows)
+    for index, row in enumerate(rows):
+        parts = re.split(r" {2,}", row.strip(), maxsplit=1)
+        for size in DISPLAY_FONT_SIZES:
+            font = display_font(size)
+            text_width = sum(draw.textlength(part, font=font) for part in parts)
+            if text_width + 8 * (len(parts) - 1) <= width - 2 * DISPLAY_MARGIN:
+                break
+        middle = round(band * index + band / 2)
+        draw.text((DISPLAY_MARGIN, middle), parts[0], fill=1, font=font, anchor="lm")
+        if len(parts) > 1:
+            draw.text((width - DISPLAY_MARGIN, middle), parts[1], fill=1, font=font, anchor="rm")
+    return image

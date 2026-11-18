@@ -6,11 +6,11 @@ Inspired by some popular Momir-style printers for Magic: The Gathering (https://
 
 Players set a cost and optional filters (arena and keyword), then press Print. A Raspberry Pi picks a random unit that matches the active player's aspects and prints it on a 58mm thermal printer, so it can be played in paper. Aspect lights on the front panel show each player's aspects.
 
-**Status:** work in progress. The aspect lights work. The knobs, buttons, display and printer are still to come, and this guide will grow as they're added.
+**Status:** work in progress. The aspect lights, display, knobs, and buttons work. The printer is still to come, and this guide will grow as they're added.
 
 ## Contents
 
-1. [Hardware setup](#hardware-setup): flash the microSD card, first boot, wire the aspect lights, knobs and buttons
+1. [Hardware setup](#hardware-setup): flash the microSD card, first boot, wire the aspect lights, knobs, buttons and display
 2. [Software setup](#software-setup): connect over SSH, configure the Pi, get the code and card data
 3. [Software tests](#software-tests): test each piece of hardware on its own, then run the simulator
 
@@ -26,6 +26,7 @@ Players set a cost and optional filters (arena and keyword), then press Print. A
 - 74AHCT14 hex inverter, to raise the LED data signal from 3.3V to 5V
 - 4 KY-040 rotary encoders (the knobs), with knob caps
 - 2 arcade buttons, a 30mm one for Print and a 24mm one for Utility, with 0.11" quick-connect wires. LED buttons are fine; the LEDs aren't used.
+- Waveshare 2.42" OLED display (128×64, SSD1309, SPI), with its 7-wire cable
 - Breadboard and jumper wires
 
 ### 1. Flash the microSD card
@@ -130,6 +131,25 @@ Only the player and cost knobs' pushes (SW) do anything in the game, but wiring 
 - The quick-connect wires end in a 2-pin plug. Push it into the breadboard so its **two pins land in two different rows**. If both land in the same row, the button reads as always pressed. Then run one jumper from each row: one to the Pi pin, one to the − rail.
 - The utility button is on GPIO 3 because pressing a button on that pin wakes a Pi that has been shut down.
 
+### 5. Wire the display
+
+**Shut down and unplug the Pi first.** The display runs on **3.3V**, the same rail as the knobs. It also accepts 5V, but 3.3V keeps its logic at the Pi's level.
+
+The display's cable has seven wires. Go by the labels printed on the display's board, since wire colors can vary:
+
+| Display pin | Usual wire color | Goes to |
+|---|---|---|
+| VCC | red | 3.3V **+ rail** |
+| GND | black | **− rail** |
+| DIN | blue | pin 19 (GPIO 10) |
+| CLK | yellow | pin 23 (GPIO 11) |
+| CS | orange | pin 24 (GPIO 8) |
+| DC | green | pin 18 (GPIO 24) |
+| RST | white | pin 22 (GPIO 25) |
+
+- The display ships set to SPI. Don't change the resistors on its back, which switch it to I2C.
+- Pins 22 and 24 are easy to swap. If they are, the screen stays black.
+
 ---
 
 ## Software setup
@@ -195,7 +215,7 @@ Everything on the Pi runs with one Python environment in the project folder. `--
 **Pi:**
 ```bash
 python3 -m venv --system-site-packages ~/SWU-Printer/.venv
-~/SWU-Printer/.venv/bin/pip install rpi_ws281x
+~/SWU-Printer/.venv/bin/pip install rpi_ws281x luma.oled
 sudo apt install -y python3-gpiozero python3-lgpio
 ```
 The `apt` line is for the knobs and buttons. Raspberry Pi OS usually has these already, in which case it changes nothing.
@@ -276,6 +296,23 @@ If something looks wrong, the settings are at the top of `swu_momir/hw/inputs.py
 | Quick double-presses come through as two single presses | Raise `DOUBLE_PRESS_SECONDS`. Lower it if single presses feel slow. |
 | `No module named 'gpiozero'` | Run the `apt` line from [Make the Python environment](#5-make-the-python-environment). |
 
+### Display
+
+With the display wired as in [Wire the display](#5-wire-the-display):
+```bash
+.venv/bin/python -m tools.oled_test
+```
+This doesn't need `sudo`. The screen first shows a border around its edge, then three sample screens the way the game draws them, each named in the terminal. It turns off after 15 seconds, or sooner with **Ctrl+C**.
+
+| Problem | Fix |
+|---|---|
+| The screen stays black | Check VCC and GND, then check that CS is on pin 24 and RST on pin 22, not swapped. |
+| Garbled or shifted text | DC and RST are probably swapped. |
+| The border is cut off on one side | The display isn't lined up with the driver. That needs a change to the driver. |
+| Text is too big or too small | Change `DISPLAY_FONT_SIZES` in `swu_momir/render.py`. |
+| `No module named 'luma'` | Run the `pip` line from [Make the Python environment](#5-make-the-python-environment). |
+| `No module named 'RPi'` | Run `sudo apt install -y python3-rpi-lgpio`. |
+
 ### Simulator
 
 The simulator runs the machine's logic in the terminal, with keys standing in for the knobs and buttons. It shows the lights and the display as text. This is useful for tests while building when all components may not be integrated yet or to pinpoint specific failures.
@@ -288,11 +325,11 @@ On the Pi, add `--lights` to also show the aspect lights on the real LEDs:
 ```bash
 sudo .venv/bin/python -m tools.sim --lights
 ```
-Without `--lights`, it runs on the Pi with plain `python3 -m tools.sim`.
+Without `--lights`, it doesn't need `sudo`.
 
-Add `--controls` to play with the real knobs and buttons, with the terminal standing in for the display. The keys keep working too. With both:
+Add `--display` to also show the display on the real OLED, and `--controls` to play with the real knobs and buttons. The keys keep working too. With everything:
 ```bash
-sudo .venv/bin/python -m tools.sim --lights --controls
+sudo .venv/bin/python -m tools.sim --lights --display --controls
 ```
 
 | Control | Keys |

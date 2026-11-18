@@ -5,6 +5,7 @@ Run from the project folder with:  python -m tools.sim  (python3 on the Pi)
 To also show the aspect lights on the real LEDs, run it on the Pi with:
     sudo .venv/bin/python -m tools.sim --lights
 Add --controls to take input from the real knobs and buttons too. The keys still work.
+Add --display to also show the display on the real OLED. It doesn't need sudo.
 
 Printed cards are saved to cache/last_print.png, so keep that open in an editor
 tab to see them. Over SSH on the Pi, the status line names the card instead.
@@ -184,6 +185,12 @@ def main(state_path=STATE_PATH) -> None:
     machine = Machine(load_units(), load_tokens(), state_path)
     args = sys.argv[1:]
     lights = Lights(machine) if "--lights" in args else None
+    screen = None
+    if "--display" in args:
+        from swu_momir.hw.display import Display  # Pi-only
+        from swu_momir.render import render_display
+
+        screen = Display()
     controls = None
     if "--controls" in args:
         from swu_momir.hw.inputs import Inputs  # Pi-only
@@ -199,6 +206,8 @@ def main(state_path=STATE_PATH) -> None:
         print(("\x1b[2J\x1b[H" if interactive else "\n") + frame(machine, status), flush=True)
         if lights:
             lights.update()
+        if screen:
+            screen.show(render_display(machine.display_rows()))
 
     try:
         with keys_without_enter():
@@ -221,6 +230,8 @@ def main(state_path=STATE_PATH) -> None:
     finally:
         if lights:
             lights.off()
+        if screen:
+            screen.off()
     if controls:
         # Closing gpiozero's buttons can hang, so skip it: the pins are freed when the program ends.
         sys.stdout.flush()
