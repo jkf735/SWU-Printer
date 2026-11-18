@@ -4,7 +4,8 @@ Run from the project folder with:  python -m tools.sim  (python3 on the Pi)
 
 To also show the aspect lights on the real LEDs, run it on the Pi with:
     sudo .venv/bin/python -m tools.sim --lights
-Add --controls to take input from the real knobs and buttons too. The keys still work.
+Add --controls to take input from the real knobs and buttons too, and light the button
+LEDs. The keys still work.
 Add --display to also show the display on the real OLED. It doesn't need sudo.
 
 Printed cards are saved to cache/last_print.png, so keep that open in an editor
@@ -18,6 +19,7 @@ import queue
 import shutil
 import sys
 import threading
+import time
 from contextlib import contextmanager
 
 from swu_momir.data.cards import CACHE_PATH, load_tokens, load_units
@@ -142,6 +144,34 @@ class Lights:
             self.leds.off()
 
 
+class ButtonLights:
+    """Mirrors the machine on the real button LEDs. Print goes dark for the cooldown after
+    each print. The pins are let go when the program ends, which relights Utility."""
+
+    def __init__(self, machine: Machine):
+        from swu_momir.hw.button_leds import ButtonLeds  # Pi-only
+        from swu_momir.hw.inputs import PRINT_COOLDOWN_SECONDS
+
+        self.machine = machine
+        self.leds = ButtonLeds()
+        self.cooldown = PRINT_COOLDOWN_SECONDS
+        self.lock = threading.Lock()  # a timer thread and the key loop both update the LEDs
+        self.dark_until = 0.0
+
+    def update(self) -> None:
+        with self.lock:
+            lit = set(self.machine.lit_buttons())
+            if time.monotonic() < self.dark_until:
+                lit.discard("Print")
+            self.leds.show(lit)
+
+    def printed(self) -> None:
+        self.dark_until = time.monotonic() + self.cooldown
+        timer = threading.Timer(self.cooldown, self.update)
+        timer.daemon = True
+        timer.start()
+
+
 def light(machine: Machine, name: str, label: str) -> str:
     """Return one light as text: [Vig] is lit, >Vig< is the setup cursor, and vig is dark."""
     is_lit = name in machine.lit_lights()
@@ -156,8 +186,10 @@ def frame(machine: Machine, status: str) -> str:
     bottom_row = " ".join(light(machine, name, name[:3]) for name in SETUP_CURSOR)
     display = [f"| {row:<22} |" for row in machine.display_rows()]
     border = "+" + "-" * 24 + "+"
-    return "\n".join([f"x2  {top_row}", f"    {bottom_row}", "", border, *display, border, "",
-                      status, "", LEGEND])
+    buttons = " ".join(f"[{name}]" if name in machine.lit_buttons() else f" {name.lower()} "
+                       for name in ("Print", "Utility"))
+    return "\n".join([f"x2  {top_row}", f"    {bottom_row}", "", border, *display, border,
+                      f"Button lights: {buttons}", "", status, "", LEGEND])
 
 
 def describe(card: dict) -> str:
@@ -196,6 +228,9 @@ def main(state_path=STATE_PATH) -> None:
         from swu_momir.hw.inputs import Inputs  # Pi-only
 
         controls = Inputs()
+        buttons = ButtonLights(machine)
+    else:
+        buttons = None
     # The keys and the real controls send the same events, into one queue.
     events = controls.events if controls else queue.Queue()
     interactive = sys.stdin.isatty()
@@ -208,6 +243,8 @@ def main(state_path=STATE_PATH) -> None:
             lights.update()
         if screen:
             screen.show(render_display(machine.display_rows()))
+        if buttons:
+            buttons.update()
 
     try:
         with keys_without_enter():
@@ -219,6 +256,8 @@ def main(state_path=STATE_PATH) -> None:
                     result = machine.press(event)
                     if isinstance(result, PrintCard):
                         status = show_print(result.card)
+                        if buttons:
+                            buttons.printed()
                     elif isinstance(result, ShutDown):
                         draw("The Pi would shut down now. Run the sim again to wake it.")
                         break

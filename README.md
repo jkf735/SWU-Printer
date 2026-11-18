@@ -10,7 +10,7 @@ Players set a cost and optional filters (arena and keyword), then press Print. A
 
 ## Contents
 
-1. [Hardware setup](#hardware-setup): flash the microSD card, first boot, wire the aspect lights, knobs, buttons and display
+1. [Hardware setup](#hardware-setup): flash the microSD card, first boot, wire the aspect lights, knobs, buttons, display and button LEDs
 2. [Software setup](#software-setup): connect over SSH, configure the Pi, get the code and card data
 3. [Software tests](#software-tests): test each piece of hardware on its own, then run the simulator
 
@@ -25,7 +25,7 @@ Players set a cost and optional filters (arena and keyword), then press Print. A
 - WS2811 5V pixel string (12mm bullet pixels). Only the first 11 pixels are used.
 - 74AHCT14 hex inverter, to raise the LED data signal from 3.3V to 5V
 - 4 KY-040 rotary encoders (the knobs), with knob caps
-- 2 arcade buttons, a 30mm one for Print and a 24mm one for Utility, with 0.11" quick-connect wires. LED buttons are fine; the LEDs aren't used.
+- 2 arcade buttons, a 30mm one for Print and a 24mm one for Utility, with 0.11" quick-connect wires. LED buttons are optional: their LEDs light the buttons, but the game works without them. These are Adafruit 3487 and 3430.
 - Waveshare 2.42" OLED display (128×64, SSD1309, SPI), with its 7-wire cable
 - Breadboard and jumper wires
 
@@ -78,7 +78,9 @@ Put the chip on the breadboard across the center gap. With its notch pointing aw
 | 1 (input 1A) | Pi pin 12 (GPIO 18) |
 | 2 (output 1Y) | pin 3 |
 | 4 (output 2Y) | LED string data in |
-| 5, 9, 11, 13 (unused inputs) | − rail (Ground) |
+| 11, 13 (unused inputs) | − rail (Ground) |
+
+Pins 5, 6, 8 and 9 are for the button LEDs, in [Wire the button LEDs](#6-wire-the-button-leds). If you skip those, connect pins 5 and 9 to the − rail as well, because a chip input left unconnected can switch at random.
 
 The pixels light in this order along the chain. Pixel 0 is closest to the Pi:
 
@@ -127,7 +129,7 @@ Only the player and cost knobs' pushes (SW) do anything in the game, but wiring 
 | Print | pin 7 (GPIO 4) | − rail |
 | Utility | pin 5 (GPIO 3) | − rail |
 
-- **LED buttons have four terminals.** Two are the switch and two are the unused LED. To find the switch, set a multimeter to continuity (the beep setting): the pair that beeps only while the button is pressed is the switch.
+- **LED buttons have four terminals.** Two are the switch and two are the LED. To find the switch, set a multimeter to continuity (the beep setting): the pair that beeps only while the button is pressed is the switch.
 - The quick-connect wires end in a 2-pin female socket. Push a male-to-male jumper into each of its two holes, then run one jumper to the Pi pin and the other to the − rail.
 - The utility button is on GPIO 3 because pressing a button on that pin wakes a Pi that has been shut down.
 
@@ -149,6 +151,23 @@ The display's cable has seven wires. Go by the labels printed on the display's b
 
 - The display ships set to SPI. Don't change the resistors on its back, which switch it to I2C.
 - Pins 22 and 24 are easy to swap. If they are, the screen stays black.
+
+### 6. Wire the button LEDs
+
+This step is optional. The buttons' LEDs need 5V, which a Pi pin can't supply, so each one runs from the 5V rail through one of the 74AHCT14's spare inverters. Setting the Pi pin high lights the LED, and the game can dim it.
+
+**Shut down and unplug the Pi first.** If chip pins 5 and 9 are connected to the − rail, remove those jumpers first.
+
+Push a male-to-male jumper into each hole of the LED's quick-connect socket (the LED terminals, not the switch ones). Plug each chip connection into a free hole in that chip pin's breadboard row.
+
+| Button | LED + wire | LED's other wire | Pi pin → chip pin |
+|---|---|---|---|
+| Print | 5V + rail | chip pin 8 | pin 13 (GPIO 27) → chip pin 9 |
+| Utility | 5V + rail | chip pin 6 | pin 3 (GPIO 2) → chip pin 5 |
+
+- **An LED only works one way round.** On ours the + wire was grey on Print and white on Utility, but check yours: if an LED stays dark in the test, swap its two jumpers. Backwards does no harm.
+- **The Utility LED lights as soon as the Pi has power**, and stays lit while the Pi is shut down. GPIO 2 has a built-in pull-up, which keeps the pin high whenever no software is using it. That makes the red button glow exactly when pressing it would wake the Pi.
+- The Print LED doesn't do this. GPIO 27 defaults low, so Print stays dark until the software lights it. If it lights by itself, check the jumper into chip pin 9. A loose one leaves the input floating.
 
 ---
 
@@ -312,6 +331,22 @@ This doesn't need `sudo`. The screen first shows a border around its edge, then 
 | `No module named 'luma'` | Run the `pip` line from [Make the Python environment](#5-make-the-python-environment). |
 | `No module named 'RPi'` | Run `sudo apt install -y python3-rpi-lgpio`. |
 
+### Button LEDs
+
+With the button LEDs wired as in [Wire the button LEDs](#6-wire-the-button-leds):
+```bash
+.venv/bin/python -m tools.button_led_test
+```
+Before it runs, the red Utility LED should already be lit and the green Print LED dark. The test lights Print, then Utility, each at 100%, 50%, 20% and 5% brightness, then blinks both. When it ends, Utility lights again by itself and Print stays dark.
+
+In the game, Print is lit whenever pressing it would print, and goes dark while a card prints and for 2 seconds after. Utility is lit only when pressing it is the way forward: in token mode (to exit) and while the Pi is shut down (to wake it). The simulator's `--controls` option lights them this way.
+
+| Problem | Fix |
+|---|---|
+| An LED stays dark | It's backwards. Swap its two jumpers. |
+| The Print LED lights by itself | The jumper from Pi pin 13 to chip pin 9 is loose. |
+| An LED flickers when dimmed | The dimming runs in software. Report it, since the game's brightness setting may need to change. |
+
 ### Simulator
 
 The simulator runs the machine's logic in the terminal, with keys standing in for the knobs and buttons. It shows the lights and the display as text. This is useful for tests while building when all components may not be integrated yet or to pinpoint specific failures.
@@ -326,7 +361,7 @@ sudo .venv/bin/python -m tools.sim --lights
 ```
 Without `--lights`, it doesn't need `sudo`.
 
-Add `--display` to also show the display on the real OLED, and `--controls` to play with the real knobs and buttons. The keys keep working too. With everything:
+Add `--display` to also show the display on the real OLED, and `--controls` to play with the real knobs and buttons and light the button LEDs. The keys keep working too. With everything:
 ```bash
 sudo .venv/bin/python -m tools.sim --lights --display --controls
 ```

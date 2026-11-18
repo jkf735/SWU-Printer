@@ -1,7 +1,7 @@
 """What the machine is doing, and how it responds to the knobs and buttons.
 
 This has no hardware in it. Drivers send events to turn() and press(), carry out
-whatever press() returns, then show display_rows() and lit_lights().
+whatever press() returns, then show display_rows(), lit_lights() and lit_buttons().
 """
 
 import json
@@ -219,6 +219,16 @@ class Machine:
             if count == 2:
                 lit.add(f"{aspect} x2")
         return frozenset(lit)
+
+    def lit_buttons(self) -> frozenset[str]:
+        """Return the buttons to light: Print when a press would print, and Utility when a
+        press leaves the current mode. The drivers also keep Print dark while a card prints
+        and through the cooldown after a press."""
+        if self.mode is Mode.NORMAL:
+            return frozenset({"Print"})
+        if self.mode is Mode.TOKEN:
+            return frozenset({"Print", "Utility"})
+        return frozenset()
 
     def _save(self) -> None:
         document = {
